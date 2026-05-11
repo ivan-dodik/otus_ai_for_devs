@@ -4,3 +4,5 @@
 
 * [hw\_02](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw02) -
    Генерация простого приложения в IDE
+* [hw\_06](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw06) -
+   Pевью кода opensource проекта
