@@ -1,0 +1,11 @@
+.devcontainer/
+.git/
+.github/
+images/
+lib/
+mk/
+planning/
+src/config/
+src/platform/
+#src/test/
+src/utils/

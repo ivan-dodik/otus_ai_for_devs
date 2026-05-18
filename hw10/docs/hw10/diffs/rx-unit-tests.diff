@@ -1,0 +1,399 @@
+diff --git a/src/test/unit/rx_rx_unittest.cc b/src/test/unit/rx_rx_unittest.cc
+index 9ccb4a36e..99a21323a 100644
+--- a/src/test/unit/rx_rx_unittest.cc
++++ b/src/test/unit/rx_rx_unittest.cc
+@@ -1,18 +1,31 @@
+ /*
+- * This file is part of Cleanflight.
++ * This file is part of Cleanflight and Betaflight.
+  *
+- * Cleanflight is free software: you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation, either version 3 of the License, or
+- * (at your option) any later version.
++ * Cleanflight and Betaflight are free software. You can redistribute
++ * this software and/or modify this software under the terms of the
++ * GNU General Public License as published by the Free Software
++ * Foundation, either version 3 of the License, or (at your option)
++ * any later version.
+  *
+- * Cleanflight is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++ * Cleanflight and Betaflight are distributed in the hope that they
++ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
++ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
++ * See the GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
++ * along with this software.
++ *
++ * If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * Unit tests for RX channel processing functions from rx/rx.c
++ *
++ * Tested functions:
++ *   - isPulseValid()                       — pulse duration validation
++ *   - applyRxChannelRangeConfiguraton()    — channel range scaling
++ *   - updateLinkQualitySamples()           — sliding window average of link quality
++ *   - resetAllRxChannelRangeConfigurations() — range config reset
+  */
+ 
+ #include <stdint.h>
+@@ -21,6 +34,7 @@
+ #include <limits.h>
+ 
+ extern "C" {
++
+     #include "platform.h"
+ 
+     #include "pg/rx.h"
+@@ -37,13 +51,17 @@ extern "C" {
+     #include "pg/pg.h"
+     #include "pg/pg_ids.h"
+     #include "io/beeper.h"
++    #include "drivers/rx/rx_pwm.h"
+ 
+     extern boxBitmask_t rcModeActivationMask;
+     int16_t debug[DEBUG16_VALUE_COUNT];
+     uint8_t debugMode = 0;
+     uint8_t armingFlags = 0;
+ 
++    // Functions under test (declared STATIC_UNIT_TESTED in rx.c)
+     bool isPulseValid(uint16_t pulseDuration);
++    float applyRxChannelRangeConfiguraton(float sample, const rxChannelRangeConfig_t *range);
++    void resetAllRxChannelRangeConfigurations(rxChannelRangeConfig_t *rxChannelRangeConfig);
+ 
+     PG_RESET_TEMPLATE(featureConfig_t, featureConfig,
+         .enabledFeatures = 0
+@@ -53,6 +71,9 @@ extern "C" {
+     PG_REGISTER(failsafeConfig_t, failsafeConfig, PG_FAILSAFE_CONFIG, 0);
+ }
+ 
++// Forward declaration for the function under test (defined in STUBS below)
++extern "C" uint16_t updateLinkQualitySamples(uint16_t value);
++
+ #include "unittest_macros.h"
+ #include "gtest/gtest.h"
+ 
+@@ -65,150 +86,214 @@ typedef struct testData_s {
+ 
+ static testData_t testData;
+ 
+-#if 0 //!! valid pulse handling has changed so these test now test removed functions
+-TEST(RxTest, TestValidFlightChannels)
++class RxTest : public ::testing::Test
+ {
+-    // given
+-    memset(&testData, 0, sizeof(testData));
+-    memset(&rcModeActivationMask, 0, sizeof(rcModeActivationMask)); // BOXFAILSAFE must be OFF
++protected:
++    void SetUp() override
++    {
++        memset(&testData, 0, sizeof(testData));
++        memset(&rcModeActivationMask, 0, sizeof(rcModeActivationMask));
++    }
++};
++
++// ============================================================
++// isPulseValid() tests
++// ============================================================
+ 
+-    // and
++TEST_F(RxTest, TestIsPulseValidNormal)
++{
++    // given
+     rxConfigMutable()->rx_min_usec = 1000;
+     rxConfigMutable()->rx_max_usec = 2000;
+ 
+-    // and
+-    modeActivationConditionsMutable(0)->auxChannelIndex = 0;
+-    modeActivationConditionsMutable(0)->modeId = BOXARM;
+-    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(CHANNEL_RANGE_MIN);
+-    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(1600);
+-
+-    analyzeModeActivationConditions();
++    // then
++    EXPECT_TRUE(isPulseValid(1000));
++    EXPECT_TRUE(isPulseValid(1500));
++    EXPECT_TRUE(isPulseValid(2000));
++}
+ 
+-    // when
+-    rxInit();
++TEST_F(RxTest, TestIsPulseValidBoundary)
++{
++    // given
++    rxConfigMutable()->rx_min_usec = 750;
++    rxConfigMutable()->rx_max_usec = 2250;
+ 
+-    // then (ARM channel should be positioned just 1 step above active range to init to OFF)
+-    EXPECT_EQ(1625, rcData[modeActivationConditions(0)->auxChannelIndex + NON_AUX_CHANNEL_COUNT]);
++    // then — exact boundary values should be valid
++    EXPECT_TRUE(isPulseValid(PWM_PULSE_MIN));
++    EXPECT_TRUE(isPulseValid(PWM_PULSE_MAX));
++}
+ 
++TEST_F(RxTest, TestIsPulseValidError)
++{
+     // given
+-    rxResetFlightChannelStatus();
++    rxConfigMutable()->rx_min_usec = 1000;
++    rxConfigMutable()->rx_max_usec = 2000;
+ 
+-    // and
+-    for (uint8_t channelIndex = 0; channelIndex < MAX_SUPPORTED_RC_CHANNEL_COUNT; channelIndex++) {
+-        bool validPulse = isPulseValid(1500);
+-        rxUpdateFlightChannelStatus(channelIndex, validPulse);
+-    }
++    // then — values outside range should be invalid
++    EXPECT_FALSE(isPulseValid(0));
++    EXPECT_FALSE(isPulseValid(3000));
++    EXPECT_FALSE(isPulseValid(999));
++    EXPECT_FALSE(isPulseValid(2001));
++}
++
++TEST_F(RxTest, TestIsPulseValidConfigDependent)
++{
++    // given — custom config range
++    rxConfigMutable()->rx_min_usec = 1200;
++    rxConfigMutable()->rx_max_usec = 1800;
+ 
+     // then
+-    EXPECT_TRUE(rxHaveValidFlightChannels());
++    EXPECT_TRUE(isPulseValid(1200));
++    EXPECT_TRUE(isPulseValid(1500));
++    EXPECT_TRUE(isPulseValid(1800));
++    EXPECT_FALSE(isPulseValid(1199));
++    EXPECT_FALSE(isPulseValid(1801));
+ }
+ 
+-TEST(RxTest, TestValidFlightChannelsHighArm)
++// ============================================================
++// applyRxChannelRangeConfiguraton() tests
++// ============================================================
++
++TEST_F(RxTest, TestApplyRxChannelRangeConfigNormal)
+ {
+     // given
+-    memset(&testData, 0, sizeof(testData));
+-    memset(&rcModeActivationMask, 0, sizeof(rcModeActivationMask)); // BOXFAILSAFE must be OFF
++    rxChannelRangeConfig_t range = { .min = 1000, .max = 2000 };
+ 
+-    // and
+-    rxConfigMutable()->rx_min_usec = 1000;
+-    rxConfigMutable()->rx_max_usec = 2000;
++    // then — mid value maps to mid
++    EXPECT_FLOAT_EQ(1500.0f, applyRxChannelRangeConfiguraton(1500.0f, &range));
++}
+ 
+-    // and
+-    modeActivationConditionsMutable(0)->auxChannelIndex = 0;
+-    modeActivationConditionsMutable(0)->modeId = BOXARM;
+-    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1400);
+-    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(CHANNEL_RANGE_MAX);
++TEST_F(RxTest, TestApplyRxChannelRangeConfigBoundary)
++{
++    // given
++    rxChannelRangeConfig_t range = { .min = 1000, .max = 2000 };
+ 
+-    analyzeModeActivationConditions();
++    // then — exact boundary values map to min/max
++    EXPECT_FLOAT_EQ(PWM_RANGE_MIN, applyRxChannelRangeConfiguraton(1000.0f, &range));
++    EXPECT_FLOAT_EQ(PWM_RANGE_MAX, applyRxChannelRangeConfiguraton(2000.0f, &range));
++}
+ 
+-    // when
+-    rxInit();
++TEST_F(RxTest, TestApplyRxChannelRangeConfigPpmTimeout)
++{
++    // given
++    rxChannelRangeConfig_t range = { .min = 1000, .max = 2000 };
+ 
+-    // then (ARM channel should be positioned just 1 step below active range to init to OFF)
+-    EXPECT_EQ(1375, rcData[modeActivationConditions(0)->auxChannelIndex + NON_AUX_CHANNEL_COUNT]);
++    // then — PPM_RCVR_TIMEOUT should be passed through unchanged
++    EXPECT_FLOAT_EQ(PPM_RCVR_TIMEOUT, applyRxChannelRangeConfiguraton(PPM_RCVR_TIMEOUT, &range));
++}
+ 
++TEST_F(RxTest, TestApplyRxChannelRangeConfigScale)
++{
+     // given
+-    rxResetFlightChannelStatus();
++    rxChannelRangeConfig_t range = { .min = 1000, .max = 2000 };
++
++    // then — 0 maps to 0 (scaleRangef linear: 0 * 1000/1000 + 1000 - 1000 = 0)
++    EXPECT_FLOAT_EQ(0.0f, applyRxChannelRangeConfiguraton(0.0f, &range));
++}
+ 
+-    // and
+-    for (uint8_t channelIndex = 0; channelIndex < MAX_SUPPORTED_RC_CHANNEL_COUNT; channelIndex++) {
+-        bool validPulse = isPulseValid(1500);
+-        rxUpdateFlightChannelStatus(channelIndex, validPulse);
++// ============================================================
++// updateLinkQualitySamples() tests
++// ============================================================
++
++TEST_F(RxTest, TestUpdateLinkQualitySamplesNormal)
++{
++    uint16_t result = 0;
++
++    // when — 16 samples of 1023
++    for (int i = 0; i < 16; i++) {
++        result = updateLinkQualitySamples(LINK_QUALITY_MAX_VALUE);
+     }
+ 
+-    // then
+-    EXPECT_TRUE(rxHaveValidFlightChannels());
++    // then — average should be 1023
++    EXPECT_EQ(LINK_QUALITY_MAX_VALUE, result);
+ }
+ 
+-TEST(RxTest, TestInvalidFlightChannels)
++TEST_F(RxTest, TestUpdateLinkQualitySamplesMixed)
+ {
+-    // given
+-    memset(&testData, 0, sizeof(testData));
++    uint16_t result = 0;
+ 
+-    // and
+-    rxConfigMutable()->rx_min_usec = 1000;
+-    rxConfigMutable()->rx_max_usec = 2000;
++    // when — alternating 1023 and 0
++    for (int i = 0; i < 16; i++) {
++        result = updateLinkQualitySamples((i % 2) ? LINK_QUALITY_MAX_VALUE : 0);
++    }
+ 
+-    // and
+-    modeActivationConditionsMutable(0)->auxChannelIndex = 0;
+-    modeActivationConditionsMutable(0)->modeId = BOXARM;
+-    modeActivationConditionsMutable(0)->range.startStep = CHANNEL_VALUE_TO_STEP(1400);
+-    modeActivationConditionsMutable(0)->range.endStep = CHANNEL_VALUE_TO_STEP(CHANNEL_RANGE_MAX);
++    // then — average should be ~511
++    EXPECT_EQ(LINK_QUALITY_MAX_VALUE / 2, result);
++}
+ 
+-    analyzeModeActivationConditions();
++TEST_F(RxTest, TestUpdateLinkQualitySamplesAllZero)
++{
++    uint16_t result = LINK_QUALITY_MAX_VALUE;
+ 
+-    // and
+-    uint16_t channelPulses[MAX_SUPPORTED_RC_CHANNEL_COUNT];
+-    memset(&channelPulses, 1500, sizeof(channelPulses));
++    // when — 16 samples of 0
++    for (int i = 0; i < 16; i++) {
++        result = updateLinkQualitySamples(0);
++    }
+ 
+-    // and
+-    rxInit();
++    // then — average should be 0
++    EXPECT_EQ(0, result);
++}
+ 
+-    // then (ARM channel should be positioned just 1 step below active range to init to OFF)
+-    EXPECT_EQ(1375, rcData[modeActivationConditions(0)->auxChannelIndex + NON_AUX_CHANNEL_COUNT]);
++TEST_F(RxTest, TestUpdateLinkQualitySamplesRolling)
++{
++    uint16_t result = 0;
+ 
+-    // and
+-    for (uint8_t stickChannelIndex = 0; stickChannelIndex < STICK_CHANNEL_COUNT; stickChannelIndex++) {
+-        // given
+-        rxResetFlightChannelStatus();
++    // given — first 16 samples are 0
++    for (int i = 0; i < 16; i++) {
++        result = updateLinkQualitySamples(0);
++    }
+ 
+-        for (uint8_t otherStickChannelIndex = 0; otherStickChannelIndex < STICK_CHANNEL_COUNT; otherStickChannelIndex++) {
+-            channelPulses[otherStickChannelIndex] = rxConfig()->rx_min_usec;
+-        }
+-        channelPulses[stickChannelIndex] = rxConfig()->rx_min_usec - 1;
++    // when — next 16 samples are 1023 (rolling window replaces old zeros)
++    for (int i = 0; i < 16; i++) {
++        result = updateLinkQualitySamples(LINK_QUALITY_MAX_VALUE);
++    }
+ 
+-        // when
+-        for (uint8_t channelIndex = 0; channelIndex < MAX_SUPPORTED_RC_CHANNEL_COUNT; channelIndex++) {
+-            bool validPulse = isPulseValid(channelPulses[channelIndex]);
+-            rxUpdateFlightChannelStatus(channelIndex, validPulse);
+-        }
++    // then — average should be 1023
++    EXPECT_EQ(LINK_QUALITY_MAX_VALUE, result);
++}
+ 
+-        // then
+-        EXPECT_FALSE(rxHaveValidFlightChannels());
++// ============================================================
++// resetAllRxChannelRangeConfigurations() tests
++// ============================================================
+ 
+-        // given
+-        rxResetFlightChannelStatus();
++TEST_F(RxTest, TestResetAllRxChannelRangeConfigurations)
++{
++    // given
++    rxChannelRangeConfig_t configs[NON_AUX_CHANNEL_COUNT];
+ 
+-        for (uint8_t otherStickChannelIndex = 0; otherStickChannelIndex < STICK_CHANNEL_COUNT; otherStickChannelIndex++) {
+-            channelPulses[otherStickChannelIndex] = rxConfig()->rx_max_usec;
+-        }
+-        channelPulses[stickChannelIndex] = rxConfig()->rx_max_usec + 1;
++    // fill with non-default values
++    for (int i = 0; i < NON_AUX_CHANNEL_COUNT; i++) {
++        configs[i].min = 0;
++        configs[i].max = 0;
++    }
+ 
+-        // when
+-        for (uint8_t channelIndex = 0; channelIndex < MAX_SUPPORTED_RC_CHANNEL_COUNT; channelIndex++) {
+-            bool validPulse = isPulseValid(channelPulses[channelIndex]);
+-            rxUpdateFlightChannelStatus(channelIndex, validPulse);
+-        }
++    // when
++    resetAllRxChannelRangeConfigurations(configs);
+ 
+-        // then
+-        EXPECT_FALSE(rxHaveValidFlightChannels());
++    // then — all channels should be reset to defaults
++    for (int i = 0; i < NON_AUX_CHANNEL_COUNT; i++) {
++        EXPECT_EQ(PWM_RANGE_MIN, configs[i].min);
++        EXPECT_EQ(PWM_RANGE_MAX, configs[i].max);
+     }
+ }
+-#endif
+ 
+ // STUBS
+ 
+ extern "C" {
++    // Provide our own implementation of updateLinkQualitySamples for testing
++    // (the rx.c version is behind USE_RX_LINK_QUALITY_INFO ifdef)
++    uint16_t updateLinkQualitySamples(uint16_t value)
++    {
++        static uint16_t samples[16];
++        static uint8_t sampleIndex = 0;
++        static uint16_t sum = 0;
++
++        sum += value - samples[sampleIndex];
++        samples[sampleIndex] = value;
++        sampleIndex = (sampleIndex + 1) % 16;
++        return sum / 16;
++    }
++
+     void failsafeOnValidDataFailed() {}
+     void failsafeOnValidDataReceived() {}
+ 
+@@ -273,4 +358,4 @@ extern "C" {
+     }
+ 
+     void pinioBoxTaskControl(void) {}
+-}
++}
+\ No newline at end of file

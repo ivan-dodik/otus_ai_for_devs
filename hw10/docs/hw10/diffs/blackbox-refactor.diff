@@ -1,0 +1,209 @@
+diff --git a/mk/source.mk b/mk/source.mk
+index 00bd5be8f..ae65eb61a 100644
+--- a/mk/source.mk
++++ b/mk/source.mk
+@@ -224,6 +224,7 @@ COMMON_SRC = \
+             blackbox/blackbox.c \
+             blackbox/blackbox_encoding.c \
+             blackbox/blackbox_io.c \
++            blackbox/blackbox_init.c \
+             cms/cms.c \
+             cms/cms_menu_blackbox.c \
+             cms/cms_menu_failsafe.c \
+diff --git a/src/main/blackbox/blackbox.c b/src/main/blackbox/blackbox.c
+index a1da77f85..73d6a25de 100644
+--- a/src/main/blackbox/blackbox.c
++++ b/src/main/blackbox/blackbox.c
+@@ -28,6 +28,7 @@
+ #ifdef USE_BLACKBOX
+ 
+ #include "blackbox.h"
++#include "blackbox_init.h"
+ #include "blackbox_encoding.h"
+ #include "blackbox_fielddefs.h"
+ #include "blackbox_io.h"
+@@ -336,25 +337,6 @@ static const blackboxSimpleFieldDefinition_t blackboxSlowFields[] = {
+     {"rxFlightChannelsValid", -1, UNSIGNED, PREDICT(0),      ENCODING(TAG2_3S32)}
+ };
+ 
+-typedef enum {
+-    BLACKBOX_STATE_DISABLED = 0,
+-    BLACKBOX_STATE_STOPPED,
+-    BLACKBOX_STATE_PREPARE_LOG_FILE,
+-    BLACKBOX_STATE_SEND_HEADER,
+-    BLACKBOX_STATE_SEND_MAIN_FIELD_HEADER,
+-    BLACKBOX_STATE_SEND_GPS_H_HEADER,
+-    BLACKBOX_STATE_SEND_GPS_G_HEADER,
+-    BLACKBOX_STATE_SEND_SLOW_HEADER,
+-    BLACKBOX_STATE_SEND_SYSINFO,
+-    BLACKBOX_STATE_CACHE_FLUSH,
+-    BLACKBOX_STATE_PAUSED,
+-    BLACKBOX_STATE_RUNNING,
+-    BLACKBOX_STATE_SHUTTING_DOWN,
+-    BLACKBOX_STATE_START_ERASE,
+-    BLACKBOX_STATE_ERASING,
+-    BLACKBOX_STATE_ERASED
+-} blackboxState_e;
+-
+ typedef struct blackboxMainState_s {
+     uint32_t time;
+ 
+@@ -412,7 +394,7 @@ typedef struct blackboxSlowState_s {
+ //From rc_controls.c
+ extern boxBitmask_t rcModeActivationMask;
+ 
+-static blackboxState_e blackboxState = BLACKBOX_STATE_DISABLED;
++blackboxState_e blackboxState = BLACKBOX_STATE_DISABLED;
+ 
+ static uint32_t blackboxLastArmingBeep = 0;
+ static uint32_t blackboxLastFlightModeFlags = 0; // New event tracking of flight modes
+@@ -434,19 +416,19 @@ static uint64_t blackboxConditionCache;
+ 
+ STATIC_ASSERT((sizeof(blackboxConditionCache) * 8) >= FLIGHT_LOG_FIELD_CONDITION_LAST, too_many_flight_log_conditions);
+ 
+-static uint32_t blackboxIteration;
+-static uint16_t blackboxLoopIndex;
+-static uint16_t blackboxPFrameIndex;
+-static uint16_t blackboxIFrameIndex;
++uint32_t blackboxIteration;
++uint16_t blackboxLoopIndex;
++uint16_t blackboxPFrameIndex;
++uint16_t blackboxIFrameIndex;
+ // number of flight loop iterations before logging I-frame
+ // typically 32 for 1kHz loop, 64 for 2kHz loop etc
+-STATIC_UNIT_TESTED int16_t blackboxIInterval = 0;
++int16_t blackboxIInterval = 0;
+ // number of flight loop iterations before logging P-frame
+-STATIC_UNIT_TESTED int8_t blackboxPInterval = 0;
+-STATIC_UNIT_TESTED int32_t blackboxSInterval = 0;
+-STATIC_UNIT_TESTED int32_t blackboxSlowFrameIterationTimer;
+-static bool blackboxLoggedAnyFrames;
+-static float blackboxHighResolutionScale;
++int8_t blackboxPInterval = 0;
++int32_t blackboxSInterval = 0;
++int32_t blackboxSlowFrameIterationTimer;
++bool blackboxLoggedAnyFrames;
++float blackboxHighResolutionScale;
+ 
+ /*
+  * We store voltages in I-frames relative to this, which was the voltage when the blackbox was activated.
+@@ -466,14 +448,6 @@ static blackboxMainState_t* blackboxHistory[3];
+ 
+ static bool blackboxModeActivationConditionPresent = false;
+ 
+-/**
+- * Return true if it is safe to edit the Blackbox configuration.
+- */
+-bool blackboxMayEditConfig(void)
+-{
+-    return blackboxState <= BLACKBOX_STATE_STOPPED;
+-}
+-
+ static bool blackboxIsOnlyLoggingIntraframes(void)
+ {
+     return blackboxPInterval == 0;
+@@ -609,7 +583,7 @@ static bool testBlackboxCondition(flightLogFieldCondition_e condition)
+     return (blackboxConditionCache & (uint64_t) 1 << condition) != 0;
+ }
+ 
+-static void blackboxSetState(blackboxState_e newState)
++void blackboxSetState(blackboxState_e newState)
+ {
+     //Perform initial setup required for the new state
+     switch (newState) {
+@@ -1046,37 +1020,6 @@ STATIC_UNIT_TESTED bool writeSlowFrameIfNeeded(void)
+     return shouldWrite;
+ }
+ 
+-void blackboxValidateConfig(void)
+-{
+-    // If we've chosen an unsupported device, change the device to NONE
+-    switch (blackboxConfig()->device) {
+-#ifdef USE_FLASHFS
+-    case BLACKBOX_DEVICE_FLASH:
+-#endif
+-#ifdef USE_SDCARD
+-    case BLACKBOX_DEVICE_SDCARD:
+-#endif
+-#ifdef USE_BLACKBOX_VIRTUAL
+-    case BLACKBOX_DEVICE_VIRTUAL:
+-#endif
+-    case BLACKBOX_DEVICE_SERIAL:
+-        // Device supported, leave the setting alone
+-        break;
+-
+-    default:
+-        blackboxConfigMutable()->device = BLACKBOX_DEVICE_NONE;
+-    }
+-}
+-
+-static void blackboxResetIterationTimers(void)
+-{
+-    blackboxIteration = 0;
+-    blackboxLoopIndex = 0;
+-    blackboxIFrameIndex = 0;
+-    blackboxPFrameIndex = 0;
+-    blackboxSlowFrameIterationTimer = 0;
+-}
+-
+ /**
+  * Start Blackbox logging if it is not already running. Intended to be called upon arming.
+  */
+@@ -1120,26 +1063,6 @@ static void blackboxStart(void)
+     blackboxSetState(BLACKBOX_STATE_PREPARE_LOG_FILE);
+ }
+ 
+-/**
+- * Begin Blackbox shutdown.
+- */
+-void blackboxFinish(void)
+-{
+-    switch (blackboxState) {
+-    case BLACKBOX_STATE_DISABLED:
+-    case BLACKBOX_STATE_STOPPED:
+-    case BLACKBOX_STATE_SHUTTING_DOWN:
+-        // We're already stopped/shutting down
+-        break;
+-    case BLACKBOX_STATE_RUNNING:
+-    case BLACKBOX_STATE_PAUSED:
+-        blackboxLogEvent(FLIGHT_LOG_EVENT_LOG_END, NULL);
+-        FALLTHROUGH;
+-    default:
+-        blackboxSetState(BLACKBOX_STATE_SHUTTING_DOWN);
+-    }
+-}
+-
+ /**
+  * Test Motors Blackbox Logging
+  */
+@@ -2290,30 +2213,4 @@ uint8_t blackboxCalculateSampleRate(uint16_t pRatio)
+     return llog2(32000 / (targetPidLooptime * pRatio));
+ }
+ 
+-/**
+- * Call during system startup to initialize the blackbox.
+- */
+-void blackboxInit(void)
+-{
+-    blackboxResetIterationTimers();
+-
+-    // an I-frame is written every 32ms
+-    // blackboxUpdate() is run in synchronisation with the PID loop
+-    // targetPidLooptime is 1000 for 1kHz loop, 500 for 2kHz loop etc, targetPidLooptime is rounded for short looptimes
+-    blackboxIInterval = (uint16_t)(32 * 1000 / targetPidLooptime);
+-
+-    blackboxPInterval = 1 << blackboxConfig()->sample_rate;
+-    if (blackboxPInterval > blackboxIInterval) {
+-        blackboxPInterval = 0; // log only I frames if logging frequency is too low
+-    }
+-
+-    if (blackboxConfig()->device) {
+-        blackboxSetState(BLACKBOX_STATE_STOPPED);
+-    } else {
+-        blackboxSetState(BLACKBOX_STATE_DISABLED);
+-    }
+-    blackboxSInterval = blackboxIInterval * 256; // S-frame is written every 256*32 = 8192ms, approx every 8 seconds
+-
+-    blackboxHighResolutionScale = blackboxConfig()->high_resolution ? 10.0f : 1.0f;
+-}
+ #endif

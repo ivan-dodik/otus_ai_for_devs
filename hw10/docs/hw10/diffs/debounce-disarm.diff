@@ -1,0 +1,54 @@
+diff --git a/src/main/fc/rc_controls.c b/src/main/fc/rc_controls.c
+index 592fdc1fc..885fcb78d 100644
+--- a/src/main/fc/rc_controls.c
++++ b/src/main/fc/rc_controls.c
+@@ -36,6 +36,7 @@
+ #include "config/feature.h"
+ 
+ #include "drivers/camera_control.h"
++#include "drivers/time.h"
+ 
+ #include "config/config.h"
+ #include "fc/core.h"
+@@ -137,6 +138,7 @@ throttleStatus_e calculateThrottleStatus(void)
+ #define ARM_DELAY_MS        500
+ #define STICK_DELAY_MS      50
+ #define STICK_AUTOREPEAT_MS 250
++#define ARM_DEBOUNCE_MS     50   // debounce time for switch-based DISARM
+ #define repeatAfter(t) { \
+     rcDelayMs -= (t); \
+     doNotRepeat = false; \
+@@ -148,8 +150,8 @@ void processRcStickPositions(void)
+     static int16_t rcDelayMs;
+     // hold sticks position for command combos
+     static uint8_t rcSticks;
+-    // an extra guard for disarming through switch to prevent that one frame can disarm it
+-    static uint8_t rcDisarmTicks;
++    // debounce timer for switch-based DISARM (time when BOXARM first became inactive)
++    static timeMs_t rcDisarmStartMs;
+     static bool doNotRepeat;
+     static bool pendingApplyRollAndPitchTrimDeltaSave = false;
+ 
+@@ -177,7 +179,7 @@ void processRcStickPositions(void)
+     // perform actions
+     if (!isUsingSticksToArm) {
+         if (IS_RC_MODE_ACTIVE(BOXARM)) {
+-            rcDisarmTicks = 0;
++            rcDisarmStartMs = 0;
+             // Arming via ARM BOX
+             tryArm();
+         } else {
+@@ -192,9 +194,10 @@ void processRcStickPositions(void)
+                 // Note that BOXFAILSAFE will also drive failsafeIsReceivingRxData false (immediately at start or end)
+                 // That's why we explicitly allow disarm here if BOXFAILSAFE switch is active
+                 // Note that BOXGPSRESCUE mode does not trigger failsafe - we can always disarm in that mode
+-                rcDisarmTicks++;
+-                if (rcDisarmTicks > 3) {
+-                    // require three duplicate disarm values in a row before we disarm
++                if (rcDisarmStartMs == 0) {
++                    rcDisarmStartMs = millis();
++                } else if (cmpTimeMs(millis(), rcDisarmStartMs) >= ARM_DEBOUNCE_MS) {
++                    // require stable switch position for ARM_DEBOUNCE_MS before we disarm
+                     disarm(DISARM_REASON_SWITCH);
+                 }
+             }
