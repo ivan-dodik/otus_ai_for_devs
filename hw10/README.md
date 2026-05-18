@@ -8,9 +8,9 @@
 
 ## 1. AI-инструмент
 
-**Cline** — IDE-плагин для Visual Studio Code на базе Anthropic Claude. Использует механизм `.clinerules/` для подключения инструкций к проекту. Файлы в этой директории автоматически загружаются в системный промпт агента, обеспечивая принудительное следование правилам.
+**Cline** — IDE-плагин для Visual Studio Code на базе Anthropic Claude. Использует механизм [.clinerules](.clinerules) для подключения инструкций к проекту. Файлы в этой директории автоматически загружаются в системный промпт агента, обеспечивая принудительное следование правилам.
 
-Подробнее: [`ai_tool_report.md`](docs/hw10/ai_tool_report.md)
+Подробнее: [ai_tool_report.md](docs/hw10/ai_tool_report.md)
 
 ---
 
@@ -20,13 +20,13 @@
 
 | Категория      | Файлы                                                                          | Назначение                                                            |
 | -------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| `.clinerules/` | `coding-style.md`, `project-guide.md`, `default-rules.md`, `update_prompts.md` | Правила стиля C-кода, контекст проекта, Memory Bank, документирование |
-| `docs/ai/`     | `TASKS.md`, `DEFINITION_OF_DONE.md`, `PLAN.md`, планы задач                    | Типовые сценарии, чеклист завершения, прогресс                        |
-| `memory-bank/` | 6 файлов (project, product, active, system, tech, progress)                    | Контекст для агента                                                   |
+| [.clinerules](.clinerules) | [coding-style.md](.clinerules/coding-style.md), [project-guide.md](.clinerules/project-guide.md), [default-rules.md](.clinerules/default-rules.md), [update_prompts.md](.clinerules/update_prompts.md) | Правила стиля C-кода, контекст проекта, Memory Bank, документирование |
+| [docs/ai/](docs/ai/)     | [TASKS.md](docs/ai/TASKS.md), [DEFINITION_OF_DONE.md](docs/ai/DEFINITION_OF_DONE.md), [PLAN.md](docs/ai/PLAN.md), планы задач                    | Типовые сценарии, чеклист завершения, прогресс                        |
+| [memory-bank](memory-bank/) | 6 файлов ([projectbrief.md](memory-bank/projectbrief.md), [productContext.md](memory-bank/productContext.md), [activeContext.md](memory-bank/activeContext.md), [systemPatterns.md](memory-bank/systemPatterns.md), [techContext.md](memory-bank/techContext.md), [progress.md](memory-bank/progress.md))                    | Контекст для агента                                                   |
 | Исходный код   | `blackbox_init.h/c`, `rc_controls.c`, `rx_rx_unittest.cc`, `mk/source.mk`      | Изменения в рамках проверок                                           |
-| Отчёты ДЗ      | `docs/hw10/*.md`, `docs/hw10/diffs/*.diff`                                     | Отчётность                                                            |
+| Отчёты ДЗ      | [docs/hw10/*.md](docs/hw10/), [docs/hw10/diffs/*.diff](docs/hw10/diffs/)                                     | Отчётность                                                            |
 
-Подробнее: [`created_files.md`](docs/hw10/created_files.md), [`work_report.md`](docs/hw10/work_report.md)
+Подробнее: [created_files.md](docs/hw10/created_files.md), [work_report.md](docs/hw10/work_report.md)
 
 ---
 
@@ -38,23 +38,23 @@
 
 **Промпт:** *"Напиши план выполнения типовой задачи №2: Debounce для DISARM через переключатель"*
 
-**Результат:** Агент заменил tick-based счётчик на time-based debounce (50 мс), создал план `docs/ai/task2-debounce-plan.md`, обновил документацию. Все критерии следования инструкциям пройдены.
+**Результат:** Агент заменил tick-based счётчик на time-based debounce (50 мс), создал план [task2-debounce-plan.md](docs/ai/task2-debounce-plan.md), обновил документацию. Все критерии следования инструкциям пройдены.
 
 ### Проверка 2: Рефакторинг blackbox (18.05)
 
 **Промпт:** *"Выполни задачу №3 — рефакторинг blackbox (выделение инициализации в отдельные файлы)"*
 
-**Результат:** Агент создал `blackbox_init.c/h`, выделил функции инициализации, сократил `blackbox.c` на ~60 строк, сборка для STM32F405 прошла успешно.
+**Результат:** Агент создал план [task3-blackbox-refactor-plan.md](docs/ai/task3-blackbox-refactor-plan.md), создал `blackbox_init.c/h`, выделил функции инициализации, сократил `blackbox.c` на ~60 строк, сборка для STM32F405 прошла успешно.
 
 ### Проверка 3: Unit-тесты для RX (18.05)
 
 **Промпт:** *"Напиши план для выполнения задачи №4 — unit-тесты для модуля RX"*
 
-**Результат:** Агент добавил 13 unit-тестов (Google Test) для 4 функций из `rx.c`. Все тесты проходят (13/13 PASS).
+**Результат:** Агент создал план [task4-unit-tests-plan.md](docs/ai/task4-unit-tests-plan.md),добавил 13 unit-тестов (Google Test) для 4 функций из `rx.c`. Все тесты проходят (13/13 PASS).
 
 **Вывод:** Во всех проверках агент строго следовал инструкциям — использовал требуемый формат ответа, соблюдал coding-style, обновлял документацию, добавлял преамбулы, выполнял Definition of Done.
 
-Подробнее: [`work_report.md`](docs/hw10/work_report.md)
+Подробнее: [work_report.md](docs/hw10/work_report.md)
 
 ---
 
@@ -70,7 +70,7 @@
 | Stubs для unit-тестов                                | Использован существующий Makefile, stubs только для необходимых зависимостей |
 | Синхронизация документации                           | Строгий порядок: код → CHANGES → PROMPTS → PLAN → activeContext              |
 
-Подробнее: [`difficulties_report.md`](docs/hw10/difficulties_report.md)
+Подробнее: [difficulties_report.md](docs/hw10/difficulties_report.md)
 
 ---
 
@@ -78,10 +78,10 @@
 
 | №   | Промпт                                                                                                              | Дата  | Результат                                                                  |
 | --- | ------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------- |
-| 1   | Дан документ `betaflight_coding_style.md`. Напиши на его основании правило для агента CLine.                        | 17.05 | Создан `.clinerules/coding-style.md`                                       |
-| 2   | Дан файл `task2.md` с заданием по дополнению проекта инструкциями для ИИ. Разработать и реализовать пошаговый план. | 17.05 | Созданы `project-guide.md`, `TASKS.md`, `DEFINITION_OF_DONE.md`, `PLAN.md` |
-| 3   | Напиши план выполнения типовой задачи №2: Debounce для DISARM через переключатель                                   | 17.05 | Реализован debounce, создан `task2-debounce-plan.md`                       |
-| 4   | Напиши план для выполнения задачи №4 — unit-тесты для модуля RX (RC каналы).                                        | 18.05 | 13 тестов, создан `task4-unit-tests-plan.md`                               |
-| 5   | Выполни задачу №3 — рефакторинг blackbox (выделение инициализации в отдельные файлы)                                | 18.05 | Созданы `blackbox_init.c/h`, создан `task3-blackbox-refactor-plan.md`      |
+| 1   | Дан документ [betaflight_coding_style.md](betaflight_coding_style.md). Напиши на его основании правило для агента CLine.                        | 17.05 | Создан [coding-style.md](.clinerules/coding-style.md)                                       |
+| 2   | Дан файл [task2.md](task2.md) с заданием по дополнению проекта инструкциями для ИИ. Разработать и реализовать пошаговый план. | 17.05 | Созданы [project-guide.md](.clinerules/project-guide.md), [TASKS.md](docs/ai/TASKS.md), [DEFINITION_OF_DONE.md](docs/ai/DEFINITION_OF_DONE.md), [PLAN.md](docs/ai/PLAN.md) |
+| 3   | Напиши план выполнения типовой задачи №2: Debounce для DISARM через переключатель                                   | 17.05 | Реализован debounce, создан [task2-debounce-plan.md](docs/ai/task2-debounce-plan.md)                       |
+| 4   | Напиши план для выполнения задачи №4 — unit-тесты для модуля RX (RC каналы).                                        | 18.05 | 13 тестов, создан [task4-unit-tests-plan.md](docs/ai/task4-unit-tests-plan.md)                               |
+| 5   | Выполни задачу №3 — рефакторинг blackbox (выделение инициализации в отдельные файлы)                                | 18.05 | Созданы `blackbox_init.c/h`, создан [task3-blackbox-refactor-plan.md](docs/ai/task3-blackbox-refactor-plan.md)      |
 
-Подробнее: [`prompts.md`](docs/hw10/prompts.md), [`diffs/`](docs/hw10/diffs/)
+Подробнее: [prompts.md](docs/hw10/prompts.md), [diffs/](docs/hw10/diffs/)
