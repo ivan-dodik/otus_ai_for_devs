@@ -8,3 +8,6 @@
    Pевью кода opensource проекта
 * [hw\_10](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw10) -
    Дополнение проекта инструкциями для ии
+* [hw\_12](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw12) -
+   Минимальный агент на LangChain
+
