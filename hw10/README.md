@@ -85,3 +85,7 @@
 | 5   | Выполни задачу №3 — рефакторинг blackbox (выделение инициализации в отдельные файлы)                                | 18.05 | Созданы `blackbox_init.c/h`, создан [task3-blackbox-refactor-plan.md](docs/ai/task3-blackbox-refactor-plan.md)      |
 
 Подробнее: [prompts.md](docs/hw10/prompts.md), [diffs/](docs/hw10/diffs/)
+
+## Лицензия
+
+GPLv3.0

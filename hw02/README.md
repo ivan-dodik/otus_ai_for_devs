@@ -279,3 +279,7 @@ const API_URL = 'http://localhost:5001';
 Промпты описаны в [task](./task.md) вручную, также агент сохранял их в [PROMPTS](./PROMPTS.md).
 
 Для генерации использовал Copilot, модель Kwaipilot KAT-Coder-Pro V2 через Openrouter. Потрачено 26,31 млн токенов, стоимость составила 2,32$.
+
+## Лицензия
+
+GPLv3.0

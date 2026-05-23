@@ -73,3 +73,7 @@
 4. Анализ незавершённых решений → `docs/unresolved-issues-report.md`
 5. Анализ RC сигналов → `docs/rc_signals_analysis.md`
 6. Подготовка отчёта о ревью → `docs/review_report.md`
+
+## Лицензия
+
+GPLv3.0
