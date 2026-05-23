@@ -28,18 +28,22 @@ flowchart TB
     subgraph "Agent"
         CLI & Web --> AgentCore["create_react_agent<br/>Ollama LLM<br/>MemorySaver"]
         AgentCore --> SystemPrompt["System Prompt<br/>(контракт ответа)"]
-        AgentCore --> Tools["Kitsu Tools"]
+        AgentCore --> Tools["Kitsu Tools<br/>(9 инструментов)"]
     end
     
-    subgraph "Tools"
-        Tools --> T1["search_anime"]
-        Tools --> T2["get_anime_details"]
-        Tools --> T3["get_anime_info<br/>(поиск + детали)"]
-        Tools --> T4["get_anime_by_genre"]
-        Tools --> T5["get_trending_anime"]
+    subgraph "Kitsu Tools"
+        Tools --> T1["search_anime<br/>поиск по названию"]
+        Tools --> T2["get_anime_details<br/>детали по ID"]
+        Tools --> T3["get_anime_info<br/>поиск + детали"]
+        Tools --> T4["get_anime_by_genre<br/>поиск по жанру"]
+        Tools --> T5["get_trending_anime<br/>тренды"]
+        Tools --> T6["get_tags<br/>список жанров"]
+        Tools --> T7["find_similar_anime<br/>похожие аниме"]
+        Tools --> T8["recommend_anime<br/>персональные рекомендации"]
+        Tools --> T9["search_anime_by_filter<br/>универсальный поиск"]
     end
     
-    T1 & T2 & T3 & T4 & T5 --> Kitsu["Kitsu API<br/>https://kitsu.io/api/edge"]
+    T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & T9 --> Kitsu["Kitsu API<br/>https://kitsu.io/api/edge"]
 ```
 
 ## Установка
