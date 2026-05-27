@@ -1,0 +1,7 @@
+# BCM config for route_basic example
+# Port configuration
+port 1-4 enable=1
+port 1-4 speed=10000
+# VLAN config
+vlan 100 create
+vlan 100 port 1-4

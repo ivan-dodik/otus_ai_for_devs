@@ -1,0 +1,23 @@
+{
+  "Tomahawk4": {
+    "dev_ids": ["BCM56980_DEVICE_ID"],
+    "feature_macros": ["BCM_TOMAHAWK4_SUPPORT", "INCLUDE_L3", "INCLUDE_MPLS"],
+    "soc_dirs": ["src/bcm/esw/tomahawk4/"],
+    "modules": ["L2", "L3", "VLAN"],
+    "example_apis": ["bcm_l2_addr_add", "bcm_vlan_create", "bcm_l3_route_add"]
+  },
+  "Trident3": {
+    "dev_ids": ["BCM56870_DEVICE_ID"],
+    "feature_macros": ["BCM_TRIDENT3_SUPPORT", "INCLUDE_L3"],
+    "soc_dirs": ["src/bcm/esw/trident3/"],
+    "modules": ["L2", "L3", "VLAN"],
+    "example_apis": ["bcm_vlan_create"]
+  },
+  "Jericho2": {
+    "dev_ids": ["BCM58800_DEVICE_ID"],
+    "feature_macros": ["BCM_JERICHO2_SUPPORT", "INCLUDE_L3", "INCLUDE_MPLS"],
+    "soc_dirs": ["src/bcm/esw/jericho2/"],
+    "modules": ["L2", "L3", "VLAN", "MPLS"],
+    "example_apis": ["bcm_l3_route_add", "bcm_mpls_tunnel_initiator_set"]
+  }
+}

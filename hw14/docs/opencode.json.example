@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "openbcm-helper": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "src"],
+      "env": {
+        "OPENBCM_SDK_PATH": "/path/to/openbcm-sdk-6.5.27",
+        "OPENBCM_MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

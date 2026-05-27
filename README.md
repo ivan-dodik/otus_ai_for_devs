@@ -10,4 +10,5 @@
    Дополнение проекта инструкциями для ии
 * [hw\_12](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw12) -
    Минимальный агент на LangChain
-
+* [hw\_14](https://github.com/ivan-dodik/otus_ai_for_devs/tree/master/hw14) -
+   Простой MCP-сервер
